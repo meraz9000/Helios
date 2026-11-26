@@ -115,6 +115,28 @@ impl DeviceStore {
         Ok(tok)
     }
 
+    /// Reload devices and pairing tokens from disk (so tokens added via
+    /// `docker exec helios-relay helios-relay gen-pairing-token` take effect immediately).
+    pub fn reload_from_disk(&mut self) -> Result<()> {
+        let Some(path) = self.path.clone() else {
+            return Ok(());
+        };
+        if !path.exists() {
+            return Ok(());
+        }
+        let raw = fs::read_to_string(&path)?;
+        let parsed: StoreFile = toml::from_str(&raw)?;
+        for dev in parsed.devices {
+            self.devices.entry(dev.device_id.clone()).or_insert(dev);
+        }
+        for tok in parsed.pairing_tokens {
+            if !tok.is_expired() {
+                self.pairing_tokens.entry(tok.token.clone()).or_insert(tok);
+            }
+        }
+        Ok(())
+    }
+
     /// Consume a one-time pairing token (or verify the bootstrap token) and enroll the device.
     pub fn enroll_with_token(
         &mut self,
@@ -125,6 +147,7 @@ impl DeviceStore {
         role: DeviceRole,
         public_key_b64: String,
     ) -> Result<bool> {
+        let _ = self.reload_from_disk();
         self.prune_expired_tokens();
 
         let bootstrap_ok = self
