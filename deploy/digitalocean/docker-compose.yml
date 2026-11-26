@@ -1,0 +1,46 @@
+services:
+  helios-relay:
+    build:
+      context: ../..
+      dockerfile: deploy/digitalocean/Dockerfile
+    container_name: helios-relay
+    restart: unless-stopped
+    ports:
+      # Integrated QUIC UDP rendezvous (NAT discovery) + encrypted QUIC UDP relay fallback
+      - "${HELIOS_UDP_PORT:-3478}:${HELIOS_UDP_PORT:-3478}/udp"
+    environment:
+      HELIOS_BIND: "0.0.0.0:8080"
+      HELIOS_UDP_BIND: "0.0.0.0:${HELIOS_UDP_PORT:-3478}"
+      HELIOS_STORE_PATH: "/data/devices.toml"
+      HELIOS_PUBLIC_HOST: "${HELIOS_PUBLIC_HOST}"
+      HELIOS_UDP_PORT: "${HELIOS_UDP_PORT:-3478}"
+      HELIOS_BOOTSTRAP_TOKEN: "${HELIOS_BOOTSTRAP_TOKEN:-}"
+      RUST_LOG: "${RUST_LOG:-info}"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: helios-caddy
+    restart: unless-stopped
+    depends_on:
+      - helios-relay
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      HELIOS_PUBLIC_HOST: "${HELIOS_PUBLIC_HOST}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

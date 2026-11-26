@@ -1,0 +1,20 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+*.pdb
+
+# Swift / macOS build artifacts
+apps/helios-macos/.build
+apps/helios-macos/.swiftpm
+*.xcodeproj/xcuserdata
+*.xcworkspace/xcuserdata
+.DS_Store
+
+# Local secrets & runtime state
+*.key
+*.pem
+.env
+deploy/digitalocean/.env
+deploy/digitalocean/data/
+devices.toml
+identity.json

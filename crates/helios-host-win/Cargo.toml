@@ -1,0 +1,40 @@
+[package]
+name = "helios-host-win"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "helios-host"
+path = "src/main.rs"
+
+[dependencies]
+helios-proto.workspace = true
+helios-transport.workspace = true
+tokio.workspace = true
+zstd.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+uuid.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.8"
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Media_MediaFoundation",
+    "Win32_System_Com",
+    "Win32_System_DataExchange",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Power",
+    "Win32_System_RemoteDesktop",
+    "Win32_System_Variant",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }
