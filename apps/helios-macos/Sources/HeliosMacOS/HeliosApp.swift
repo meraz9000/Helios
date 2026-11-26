@@ -24,9 +24,18 @@ enum HeliosQualityMode: UInt8, CaseIterable, Identifiable {
 
 @MainActor
 final class HeliosSessionViewModel: ObservableObject {
-    @Published var relayURL: String = "wss://relay.yourdomain.com/ws"
-    @Published var targetHostID: String = ""
-    @Published var pairingToken: String = ""
+    @Published var relayURL: String = "wss://137-184-27-200.sslip.io/ws"
+    @Published var targetHostID: String = "" {
+        didSet {
+            if !targetHostID.isEmpty,
+               let saved = UserDefaults.standard.string(forKey: "helios.passcode.\(targetHostID)"),
+               accessPasscode.isEmpty
+            {
+                accessPasscode = saved
+            }
+        }
+    }
+    @Published var accessPasscode: String = ""
     @Published var onlineHosts: [OnlineHostInfo] = []
     @Published var selectedMode: HeliosQualityMode = .auto {
         didSet { bridge.setQualityMode(selectedMode.rawValue) }
@@ -40,7 +49,7 @@ final class HeliosSessionViewModel: ObservableObject {
     @Published var rttMs: Double = 0
     @Published var bitrateKbps: Int = 0
     @Published var fps: Double = 0
-    @Published var statusMessage: String = "Enter your DigitalOcean Relay WSS URL and click Refresh"
+    @Published var statusMessage: String = "Looking for online Windows Hosts..."
 
     let renderer: HeliosMetalRenderer?
     let bridge: HeliosRustBridge
@@ -90,10 +99,16 @@ final class HeliosSessionViewModel: ObservableObject {
                     self.isConnected = true
                     self.reconnectDelaySecs = 2.0
                     self.connectionPath = "QUIC Direct P2P"
+                    if !self.targetHostID.isEmpty && !self.accessPasscode.isEmpty {
+                        UserDefaults.standard.set(self.accessPasscode, forKey: "helios.passcode.\(self.targetHostID)")
+                    }
                 case 3:
                     self.isConnected = true
                     self.reconnectDelaySecs = 2.0
                     self.connectionPath = "QUIC Relay (DO)"
+                    if !self.targetHostID.isEmpty && !self.accessPasscode.isEmpty {
+                        UserDefaults.standard.set(self.accessPasscode, forKey: "helios.passcode.\(self.targetHostID)")
+                    }
                 case 1:
                     self.connectionPath = "Connecting..."
                 default:
@@ -103,7 +118,8 @@ final class HeliosSessionViewModel: ObservableObject {
                     self.rttMs = 0
                     self.bitrateKbps = 0
                     self.fps = 0
-                    if self.autoReconnect && self.wantConnected && !self.userRequestedDisconnect {
+                    let isBadPasscode = msg.localizedCaseInsensitiveContains("Passcode")
+                    if !isBadPasscode && self.autoReconnect && self.wantConnected && !self.userRequestedDisconnect {
                         self.scheduleReconnect()
                     }
                 }
@@ -122,6 +138,11 @@ final class HeliosSessionViewModel: ObservableObject {
                 self.reconnectNow()
             }
         }
+
+        // Auto-discover online Windows Hosts immediately on launch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.refreshHosts()
+        }
     }
 
     deinit {
@@ -132,18 +153,17 @@ final class HeliosSessionViewModel: ObservableObject {
 
     func refreshHosts() {
         let url = relayURL
-        let token = pairingToken
-        statusMessage = "Querying online Windows Hosts..."
+        statusMessage = "Looking for online Windows Hosts..."
         DispatchQueue.global(qos: .userInitiated).async {
-            let hosts = HeliosRustBridge.listOnlineHosts(relayURL: url, pairingToken: token)
+            let hosts = HeliosRustBridge.listOnlineHosts(relayURL: url, pairingToken: "")
             DispatchQueue.main.async {
                 self.onlineHosts = hosts
                 if let first = hosts.first, self.targetHostID.isEmpty {
                     self.targetHostID = first.device_id
                 }
                 self.statusMessage = hosts.isEmpty
-                    ? "No online Windows Hosts found (check pairing token / host service)"
-                    : "Found \(hosts.count) online Host(s)"
+                    ? "No online Windows Hosts yet — double-click helios-host.exe on your Windows PC"
+                    : "Found \(hosts.count) online Host(s) — enter Access Passcode and click Connect"
             }
         }
     }
@@ -164,7 +184,12 @@ final class HeliosSessionViewModel: ObservableObject {
         }
 
         guard !targetHostID.isEmpty else {
-            statusMessage = "Enter a Host ID (HL-XXXX-XXXX) or click Refresh first"
+            statusMessage = "Select an online Windows Host or click Refresh first"
+            return
+        }
+
+        guard !accessPasscode.isEmpty else {
+            statusMessage = "Enter the Host Access Passcode shown by helios-host.exe"
             return
         }
 
@@ -178,7 +203,7 @@ final class HeliosSessionViewModel: ObservableObject {
         let ok = bridge.connect(
             relayURL: relayURL,
             hostID: targetHostID,
-            pairingToken: pairingToken,
+            accessPasscode: accessPasscode,
             modeRaw: selectedMode.rawValue
         )
         if ok {
@@ -245,24 +270,24 @@ struct HeliosMacOSApp: App {
                         .textFieldStyle(.roundedBorder)
                         .frame(minWidth: 200)
 
-                    TextField("Host ID (HL-XXXX-XXXX)", text: $vm.targetHostID)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 155)
-
                     if !vm.onlineHosts.isEmpty {
                         Picker("", selection: $vm.targetHostID) {
                             ForEach(vm.onlineHosts) { h in
                                 Text("\(h.name) (\(h.device_id))").tag(h.device_id)
                             }
                         }
-                        .frame(width: 170)
+                        .frame(width: 210)
+                    } else {
+                        TextField("Host ID (HL-XXXX-XXXX)", text: $vm.targetHostID)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 170)
                     }
 
                     Button("Refresh") { vm.refreshHosts() }
 
-                    SecureField("Pairing Token (1st run)", text: $vm.pairingToken)
+                    SecureField("Host Access Passcode", text: $vm.accessPasscode)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 145)
+                        .frame(width: 170)
 
                     Button(vm.isConnected ? "Disconnect" : "Connect") {
                         vm.toggleConnect()

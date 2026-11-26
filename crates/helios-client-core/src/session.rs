@@ -49,6 +49,8 @@ pub struct ClientSessionConfig {
     pub relay_url: String,
     pub identity: DeviceIdentity,
     pub pairing_token: Option<String>,
+    /// Unique Host Access Passcode shown by the Windows Host on install.
+    pub access_token: Option<String>,
     pub initial_mode: QualityMode,
     /// Optional flag for testing droplet UDP relay fallback.
     pub force_relay: bool,
@@ -138,6 +140,7 @@ impl ClientSession {
 
                 sig.send(SignalingMessage::RequestSession {
                     target_host_id: target_host_id.clone(),
+                    access_token: cfg.access_token.clone(),
                 })?;
 
                 let (session_id, udp_relay_addr) = match tokio::time::timeout(

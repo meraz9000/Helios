@@ -85,6 +85,7 @@ async fn run_quic_e2e(force_relay: bool) {
     client_sig
         .send(SignalingMessage::RequestSession {
             target_host_id: host_id.device_id.clone(),
+            access_token: None,
         })
         .unwrap();
 

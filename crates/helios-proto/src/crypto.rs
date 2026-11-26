@@ -49,13 +49,42 @@ pub fn derive_device_id(public_key_bytes: &[u8; 32]) -> DeviceId {
     DeviceId(format!("HL-{}-{}", &hex_str[0..4], &hex_str[4..8]))
 }
 
-/// Persisted representation of a device's Ed25519 keypair and display label.
+/// Generate a readable, high-entropy 12-character Host Access Passcode
+/// (e.g., `K7M9-P2X4-Q8R3`) using an unambiguous alphabet (no 0/O/1/I).
+pub fn generate_access_passcode() -> String {
+    const ALPHABET: &[u8] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    let mut raw = [0u8; 12];
+    OsRng.fill_bytes(&mut raw);
+    let chars: Vec<char> = raw
+        .iter()
+        .map(|&b| ALPHABET[(b as usize) % ALPHABET.len()] as char)
+        .collect();
+    format!(
+        "{}{}{}{}-{}{}{}{}-{}{}{}{}",
+        chars[0],
+        chars[1],
+        chars[2],
+        chars[3],
+        chars[4],
+        chars[5],
+        chars[6],
+        chars[7],
+        chars[8],
+        chars[9],
+        chars[10],
+        chars[11]
+    )
+}
+
+/// Persisted representation of a device's Ed25519 keypair, display label, and unique Host Access Passcode.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct StoredIdentity {
     pub name: String,
     pub secret_key_b64: String,
     pub public_key_b64: String,
     pub device_id: DeviceId,
+    #[serde(default)]
+    pub access_passcode: Option<String>,
 }
 
 /// Device cryptographic identity used to authenticate with the DigitalOcean relay
@@ -65,6 +94,9 @@ pub struct DeviceIdentity {
     pub name: String,
     signing_key: SigningKey,
     pub device_id: DeviceId,
+    /// Unique persistent passcode required from connecting Clients before the Host
+    /// wakes screen capture or accepts remote input.
+    pub access_passcode: String,
 }
 
 impl std::fmt::Debug for DeviceIdentity {
@@ -78,7 +110,7 @@ impl std::fmt::Debug for DeviceIdentity {
 }
 
 impl DeviceIdentity {
-    /// Generate a brand-new Ed25519 identity using OS cryptographic randomness.
+    /// Generate a brand-new Ed25519 identity + unique access passcode using OS randomness.
     pub fn generate(name: impl Into<String>) -> Self {
         let mut csprng = OsRng;
         let signing_key = SigningKey::generate(&mut csprng);
@@ -88,13 +120,20 @@ impl DeviceIdentity {
             name: name.into(),
             signing_key,
             device_id,
+            access_passcode: generate_access_passcode(),
         }
     }
 
     /// Load an existing identity from JSON file, or create and save one if missing.
     pub fn load_or_create(path: &Path, default_name: impl Into<String>) -> Result<Self, CryptoError> {
         if path.exists() {
-            Self::load(path)
+            let mut id = Self::load(path)?;
+            // Persist newly generated passcode if upgrading an older identity file
+            if id.access_passcode.is_empty() {
+                id.access_passcode = generate_access_passcode();
+                id.save(path)?;
+            }
+            Ok(id)
         } else {
             let id = Self::generate(default_name);
             id.save(path)?;
@@ -114,10 +153,15 @@ impl DeviceIdentity {
         let signing_key = SigningKey::from_bytes(&secret_arr);
         let pub_bytes = signing_key.verifying_key().to_bytes();
         let device_id = derive_device_id(&pub_bytes);
+        let access_passcode = stored
+            .access_passcode
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(generate_access_passcode);
         Ok(Self {
             name: stored.name,
             signing_key,
             device_id,
+            access_passcode,
         })
     }
 
@@ -132,6 +176,7 @@ impl DeviceIdentity {
             secret_key_b64: B64.encode(self.signing_key.to_bytes()),
             public_key_b64: self.public_key_b64(),
             device_id: self.device_id.clone(),
+            access_passcode: Some(self.access_passcode.clone()),
         };
         let json = serde_json::to_string_pretty(&stored)?;
         fs::write(path, json)?;

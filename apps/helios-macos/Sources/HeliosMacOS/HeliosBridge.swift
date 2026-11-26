@@ -68,7 +68,7 @@ final class HeliosRustBridge {
     func connect(
         relayURL: String,
         hostID: String,
-        pairingToken: String,
+        accessPasscode: String,
         modeRaw: UInt8
     ) -> Bool {
         disconnect()
@@ -81,7 +81,8 @@ final class HeliosRustBridge {
             relayURL,
             idPath,
             clientName,
-            pairingToken.isEmpty ? nil : pairingToken,
+            nil,
+            accessPasscode.isEmpty ? nil : accessPasscode,
             hostID,
             modeRaw,
             selfPtr,

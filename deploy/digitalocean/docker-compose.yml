@@ -14,6 +14,7 @@ services:
       HELIOS_STORE_PATH: "/data/devices.toml"
       HELIOS_PUBLIC_HOST: "${HELIOS_PUBLIC_HOST}"
       HELIOS_UDP_PORT: "${HELIOS_UDP_PORT:-3478}"
+      HELIOS_OPEN_ENROLLMENT: "${HELIOS_OPEN_ENROLLMENT:-true}"
       HELIOS_BOOTSTRAP_TOKEN: "${HELIOS_BOOTSTRAP_TOKEN:-}"
       RUST_LOG: "${RUST_LOG:-info}"
     volumes:

@@ -98,6 +98,9 @@ pub enum SignalingMessage {
     /// Client requests a new remote desktop session to a specific Host.
     RequestSession {
         target_host_id: DeviceId,
+        /// Host Access Passcode required by the Windows Host before waking capture.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        access_token: Option<String>,
     },
 
     /// Relay notifies the always-on Host service to wake its capture agent
@@ -107,6 +110,9 @@ pub enum SignalingMessage {
         client_id: DeviceId,
         client_name: String,
         udp_relay_addr: String,
+        /// Access passcode supplied by the connecting Client for Host-side verification.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        access_token: Option<String>,
     },
 
     /// Relay informs the Client that the session has been dispatched to the Host.

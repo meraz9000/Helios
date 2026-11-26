@@ -199,6 +199,7 @@ pub unsafe extern "C" fn helios_client_list_hosts(
         relay_url,
         identity,
         pairing_token,
+        access_token: None,
         initial_mode: QualityMode::Auto,
         force_relay: false,
     };
@@ -215,18 +216,20 @@ pub unsafe extern "C" fn helios_client_list_hosts(
 }
 
 /// Start an asynchronous QUIC remote desktop session to `target_host_id`.
+/// `access_token` is the unique Host Access Passcode shown by `helios-host.exe`.
 /// Returns an opaque handle on success (must later be closed with `helios_client_disconnect`),
 /// or null if parameters/identity initialization failed.
 ///
 /// # Safety
-/// String pointers must be valid NUL-terminated UTF-8 C strings (`pairing_token` may be null).
-/// `user_data` must remain valid until `helios_client_disconnect` returns.
+/// String pointers must be valid NUL-terminated UTF-8 C strings (`pairing_token` and
+/// `access_token` may be null). `user_data` must remain valid until `helios_client_disconnect` returns.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn helios_client_connect(
     relay_url: *const c_char,
     identity_path: *const c_char,
     client_name: *const c_char,
     pairing_token: *const c_char,
+    access_token: *const c_char,
     target_host_id: *const c_char,
     initial_mode: u8,
     user_data: *mut c_void,
@@ -245,6 +248,7 @@ pub unsafe extern "C" fn helios_client_connect(
         return std::ptr::null_mut();
     };
     let pairing_token = unsafe { cstr_to_string(pairing_token) }.filter(|s| !s.is_empty());
+    let access_token = unsafe { cstr_to_string(access_token) }.filter(|s| !s.is_empty());
 
     let Ok(identity) = DeviceIdentity::load_or_create(Path::new(&identity_path), &client_name)
     else {
@@ -318,6 +322,7 @@ pub unsafe extern "C" fn helios_client_connect(
         relay_url,
         identity,
         pairing_token,
+        access_token,
         initial_mode: quality_mode_from_c(initial_mode),
         force_relay: false,
     };

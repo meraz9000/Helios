@@ -306,7 +306,10 @@ async fn handle_signaling_message(
             }
         }
 
-        SignalingMessage::RequestSession { target_host_id } => {
+        SignalingMessage::RequestSession {
+            target_host_id,
+            access_token,
+        } => {
             let mut peers = state.peers.write().await;
             let Some(client_name) = peers.get(sender_id).map(|p| p.name.clone()) else {
                 return;
@@ -335,6 +338,7 @@ async fn handle_signaling_message(
                     client_id: sender_id.clone(),
                     client_name,
                     udp_relay_addr: udp_relay_addr.clone(),
+                    access_token,
                 });
             }
             if let Some(client) = peers.get(sender_id) {

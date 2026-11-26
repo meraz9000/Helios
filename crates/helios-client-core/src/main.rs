@@ -33,7 +33,7 @@ enum Command {
 
     /// List all online Windows Hosts registered on the DigitalOcean relay.
     ListHosts {
-        #[arg(long, env = "HELIOS_RELAY_URL")]
+        #[arg(long, env = "HELIOS_RELAY_URL", default_value = "wss://137-184-27-200.sslip.io/ws")]
         relay: String,
 
         #[arg(long, env = "HELIOS_PAIRING_TOKEN")]
@@ -42,12 +42,16 @@ enum Command {
 
     /// Connect to a target Windows Host over QUIC and print live FPS, kbps, and RTT stats.
     Connect {
-        #[arg(long, env = "HELIOS_RELAY_URL")]
+        #[arg(long, env = "HELIOS_RELAY_URL", default_value = "wss://137-184-27-200.sslip.io/ws")]
         relay: String,
 
         /// Target Windows Host Device ID (e.g., HL-A1B2-C3D4).
         #[arg(long)]
         host_id: String,
+
+        /// Unique Host Access Passcode shown by helios-host.exe on the Windows PC.
+        #[arg(long, env = "HELIOS_ACCESS_PASSCODE")]
+        passcode: Option<String>,
 
         #[arg(long, env = "HELIOS_PAIRING_TOKEN")]
         pairing_token: Option<String>,
@@ -98,6 +102,7 @@ async fn main() -> Result<()> {
                 relay_url: relay,
                 identity,
                 pairing_token,
+                access_token: None,
                 initial_mode: QualityMode::Auto,
                 force_relay: false,
             };
@@ -117,6 +122,7 @@ async fn main() -> Result<()> {
         Command::Connect {
             relay,
             host_id,
+            passcode,
             pairing_token,
             mode,
             force_relay,
@@ -125,6 +131,7 @@ async fn main() -> Result<()> {
                 relay_url: relay,
                 identity,
                 pairing_token,
+                access_token: passcode,
                 initial_mode: parse_mode(&mode),
                 force_relay,
             };

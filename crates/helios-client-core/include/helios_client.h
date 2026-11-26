@@ -91,6 +91,7 @@ HeliosClientHandle *helios_client_connect(
     const char *identity_path,
     const char *client_name,
     const char *pairing_token,
+    const char *access_token,
     const char *target_host_id,
     uint8_t initial_mode,
     void *user_data,

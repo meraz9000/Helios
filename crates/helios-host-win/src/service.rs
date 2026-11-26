@@ -73,12 +73,30 @@ pub async fn run_host_daemon(cfg: HostDaemonConfig) -> Result<()> {
                             client_id,
                             client_name,
                             udp_relay_addr,
+                            access_token,
                         } => {
+                            if !passcode_matches(
+                                &cfg.identity.access_passcode,
+                                access_token.as_deref(),
+                            ) {
+                                warn!(
+                                    %session_id,
+                                    %client_id,
+                                    %client_name,
+                                    "rejected incoming session: invalid Host Access Passcode"
+                                );
+                                let _ = sig.send(SignalingMessage::EndSession {
+                                    session_id,
+                                    reason: "Invalid Host Access Passcode".into(),
+                                });
+                                continue;
+                            }
+
                             info!(
                                 %session_id,
                                 %client_id,
                                 %client_name,
-                                "received connection signal — waking capture & QUIC session worker"
+                                "access passcode verified — waking capture & QUIC session worker"
                             );
                             let (sess_tx, sess_rx) = mpsc::unbounded_channel();
                             active_sessions.lock().await.insert(session_id, sess_tx);
@@ -380,6 +398,28 @@ async fn run_active_session(
     prevent_windows_sleep(false);
 
     Ok(())
+}
+
+fn passcode_matches(expected: &str, provided: Option<&str>) -> bool {
+    let Some(raw) = provided else {
+        return false;
+    };
+    let normalize = |s: &str| -> Vec<u8> {
+        s.bytes()
+            .filter(|b| !b.is_ascii_whitespace() && *b != b'-')
+            .map(|b| b.to_ascii_uppercase())
+            .collect()
+    };
+    let a = normalize(expected);
+    let b = normalize(raw);
+    if a.len() != b.len() || a.is_empty() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
 }
 
 #[cfg(windows)]

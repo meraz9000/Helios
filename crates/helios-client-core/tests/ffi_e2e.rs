@@ -111,12 +111,14 @@ async fn c_abi_ffi_client_receives_rgba_h264_cursor_clipboard_and_sends_input() 
 
     let host_id = DeviceIdentity::generate("Win-Host-FFI");
     let host_device_id = host_id.device_id.0.clone();
+    let host_passcode = host_id.access_passcode.clone();
     let host_got_input = Arc::new(AtomicBool::new(false));
     let host_got_monitor = Arc::new(AtomicBool::new(false));
     let host_got_input_clone = host_got_input.clone();
     let host_got_monitor_clone = host_got_monitor.clone();
 
     let relay_url_host = relay_url.clone();
+    let expected_passcode = host_passcode.clone();
     let host_task = tokio::spawn(async move {
         let mut sig = SignalingClient::connect(
             &relay_url_host,
@@ -131,9 +133,11 @@ async fn c_abi_ffi_client_receives_rgba_h264_cursor_clipboard_and_sends_input() 
         if let Some(SignalingMessage::IncomingSession {
             session_id,
             udp_relay_addr,
+            access_token,
             ..
         }) = sig.recv().await
         {
+            assert_eq!(access_token.as_deref(), Some(expected_passcode.as_str()));
             let (rdv, hello) =
                 QuicRendezvous::prepare(session_id, PeerRole::Host, &udp_relay_addr)
                     .await
@@ -225,6 +229,7 @@ async fn c_abi_ffi_client_receives_rgba_h264_cursor_clipboard_and_sends_input() 
     let c_id_path = CString::new(tmp_id_path.to_str().unwrap()).unwrap();
     let c_name = CString::new("MacBook-FFI").unwrap();
     let c_token = CString::new("FFI-TOKEN").unwrap();
+    let c_passcode = CString::new(host_passcode.as_str()).unwrap();
     let c_host_id = CString::new(host_device_id.as_str()).unwrap();
 
     let list_json = tokio::task::spawn_blocking({
@@ -263,6 +268,7 @@ async fn c_abi_ffi_client_receives_rgba_h264_cursor_clipboard_and_sends_input() 
         let c_id_path = c_id_path.clone();
         let c_name = c_name.clone();
         let c_token = c_token.clone();
+        let c_passcode = c_passcode.clone();
         let c_host_id = c_host_id.clone();
         let ctx_addr = ctx_ptr as usize;
         move || unsafe {
@@ -271,6 +277,7 @@ async fn c_abi_ffi_client_receives_rgba_h264_cursor_clipboard_and_sends_input() 
                 c_id_path.as_ptr(),
                 c_name.as_ptr(),
                 c_token.as_ptr(),
+                c_passcode.as_ptr(),
                 c_host_id.as_ptr(),
                 0,
                 ctx_addr as *mut c_void,
