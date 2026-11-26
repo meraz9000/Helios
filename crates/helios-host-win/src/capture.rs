@@ -190,19 +190,21 @@ pub mod dxgi {
             device: &ID3D11Device,
             monitor_index: u32,
         ) -> Result<(IDXGIOutputDuplication, u32, u32)> {
-            let dxgi_device: IDXGIDevice = device.cast()?;
-            let adapter = dxgi_device.GetAdapter()?;
-            let output = adapter
-                .EnumOutputs(monitor_index)
-                .context("failed to enumerate DXGI monitor output")?;
-            let desc = output.GetDesc()?;
-            let width = (desc.DesktopCoordinates.right - desc.DesktopCoordinates.left) as u32;
-            let height = (desc.DesktopCoordinates.bottom - desc.DesktopCoordinates.top) as u32;
-            let output1: IDXGIOutput1 = output.cast()?;
-            let duplication = output1
-                .DuplicateOutput(device)
-                .context("DXGI DuplicateOutput failed")?;
-            Ok((duplication, width, height))
+            unsafe {
+                let dxgi_device: IDXGIDevice = device.cast()?;
+                let adapter = dxgi_device.GetAdapter()?;
+                let output = adapter
+                    .EnumOutputs(monitor_index)
+                    .context("failed to enumerate DXGI monitor output")?;
+                let desc = output.GetDesc()?;
+                let width = (desc.DesktopCoordinates.right - desc.DesktopCoordinates.left) as u32;
+                let height = (desc.DesktopCoordinates.bottom - desc.DesktopCoordinates.top) as u32;
+                let output1: IDXGIOutput1 = output.cast()?;
+                let duplication = output1
+                    .DuplicateOutput(device)
+                    .context("DXGI DuplicateOutput failed")?;
+                Ok((duplication, width, height))
+            }
         }
 
         fn ensure_staging(&mut self, desc: &D3D11_TEXTURE2D_DESC) -> Result<ID3D11Texture2D> {
@@ -238,16 +240,15 @@ pub mod dxgi {
             self.cursor_buf.resize(buf_size as usize, 0);
             let mut required = 0u32;
             let mut shape_info = DXGI_OUTDUPL_POINTER_SHAPE_INFO::default();
-            if self
-                .duplication
-                .GetFramePointerShape(
+            let hr = unsafe {
+                self.duplication.GetFramePointerShape(
                     buf_size,
                     self.cursor_buf.as_mut_ptr() as *mut _,
                     &mut required,
                     &mut shape_info,
                 )
-                .is_err()
-            {
+            };
+            if hr.is_err() {
                 return None;
             }
 

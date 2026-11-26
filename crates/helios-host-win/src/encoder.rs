@@ -178,8 +178,7 @@ mod mf_h264 {
         MFVideoInterlace_Progressive, MFT_REGISTER_TYPE_INFO, eAVEncH264VProfile_Main,
     };
     use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoTaskMemFree};
-    use windows::Win32::System::Variant::VARIANT;
-    use windows::core::Interface;
+    use windows::core::{Interface, VARIANT};
 
     use super::{HardwareVideoEncoder, rgba_to_nv12};
 

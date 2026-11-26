@@ -108,7 +108,7 @@ final class HeliosRustBridge {
                 guard let userData, let rgbaPtr, rgbaLen > 0, width > 0, height > 0 else { return }
                 let bridge = Unmanaged<HeliosRustBridge>.fromOpaque(userData).takeUnretainedValue()
                 let data = Data(bytes: rgbaPtr, count: Int(rgbaLen))
-                if let cursor = Self.makeNSCursor(
+                if let cursor = HeliosRustBridge.makeNSCursor(
                     width: Int(width),
                     height: Int(height),
                     hotspotX: Int(hotspotX),
