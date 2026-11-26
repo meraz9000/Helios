@@ -1,0 +1,91 @@
+name: Build Helios (Windows Host & macOS Viewer)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-linux:
+    name: Linux Workspace Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  build-windows:
+    name: Build Windows Host (helios-host.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build helios-host.exe (Release)
+        run: cargo build --release -p helios-host-win
+      - name: Package Windows artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist-win | Out-Null
+          Copy-Item target/release/helios-host.exe dist-win/helios-host.exe
+          Compress-Archive -Path dist-win/helios-host.exe -DestinationPath helios-host-windows-x64.zip -Force
+      - name: Upload Windows Host artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helios-host-windows-x64
+          path: |
+            dist-win/helios-host.exe
+            helios-host-windows-x64.zip
+
+  build-macos:
+    name: Build macOS Viewer (HeliosViewer)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build Rust client staticlib (libhelios_client_core.a)
+        run: cargo build --release -p helios-client-core
+      - name: Build SwiftUI + Metal + VideoToolbox viewer
+        working-directory: apps/helios-macos
+        run: swift build -c release
+      - name: Upload macOS Viewer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helios-viewer-macos
+          path: |
+            apps/helios-macos/.build/release/HeliosViewer
+            target/release/helios-cli
+
+  publish-release:
+    name: Publish Latest Pre-Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: helios-host-windows-x64
+          path: release-assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: helios-viewer-macos
+          path: release-assets
+      - name: Publish / update latest GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes 2>/dev/null || true
+          git push origin :refs/tags/latest 2>/dev/null || true
+          gh release create latest \
+            release-assets/helios-host.exe \
+            release-assets/helios-host-windows-x64.zip \
+            release-assets/HeliosViewer \
+            release-assets/helios-cli \
+            --title "Helios Latest Build" \
+            --notes "Automated release build of Helios Windows Host (helios-host.exe) and macOS Viewer (HeliosViewer)." \
+            --prerelease
