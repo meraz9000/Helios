@@ -32,14 +32,12 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist-win | Out-Null
           Copy-Item target/release/helios-host.exe dist-win/helios-host.exe
-          Compress-Archive -Path dist-win/helios-host.exe -DestinationPath helios-host-windows-x64.zip -Force
+          Compress-Archive -Path dist-win/helios-host.exe -DestinationPath dist-win/helios-host-windows-x64.zip -Force
       - name: Upload Windows Host artifact
         uses: actions/upload-artifact@v4
         with:
           name: helios-host-windows-x64
-          path: |
-            dist-win/helios-host.exe
-            helios-host-windows-x64.zip
+          path: dist-win/
 
   build-macos:
     name: Build macOS Viewer (HeliosViewer)
@@ -53,13 +51,16 @@ jobs:
       - name: Build SwiftUI + Metal + VideoToolbox viewer
         working-directory: apps/helios-macos
         run: swift build -c release
+      - name: Package macOS artifact
+        run: |
+          mkdir -p dist-mac
+          cp apps/helios-macos/.build/release/HeliosViewer dist-mac/HeliosViewer
+          cp target/release/helios-cli dist-mac/helios-cli
       - name: Upload macOS Viewer artifact
         uses: actions/upload-artifact@v4
         with:
           name: helios-viewer-macos
-          path: |
-            apps/helios-macos/.build/release/HeliosViewer
-            target/release/helios-cli
+          path: dist-mac/
 
   publish-release:
     name: Publish Latest Pre-Release
@@ -79,6 +80,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          ls -la release-assets
           gh release delete latest --yes 2>/dev/null || true
           git push origin :refs/tags/latest 2>/dev/null || true
           gh release create latest \
