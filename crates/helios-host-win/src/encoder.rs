@@ -356,8 +356,9 @@ mod mf_h264 {
                 let mut status: u32 = 0;
 
                 let hr = self.transform.ProcessOutput(0, &mut out_data, &mut status);
-                let produced_sample = std::mem::ManuallyDrop::into_inner(out_data[0].pSample);
-                let _ = std::mem::ManuallyDrop::into_inner(out_data[0].pEvents);
+                let [out_entry] = out_data;
+                let produced_sample = std::mem::ManuallyDrop::into_inner(out_entry.pSample);
+                let _ = std::mem::ManuallyDrop::into_inner(out_entry.pEvents);
 
                 match hr {
                     Ok(()) => {
