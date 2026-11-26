@@ -51,28 +51,40 @@ jobs:
       - name: Build SwiftUI + Metal + VideoToolbox viewer
         working-directory: apps/helios-macos
         run: swift build -c release
-      - name: Package macOS .app bundle
+      - name: Package Helios.app bundle with Retina icon
         run: |
-          mkdir -p dist-mac/HeliosViewer.app/Contents/MacOS
-          cp apps/helios-macos/.build/release/HeliosViewer dist-mac/HeliosViewer.app/Contents/MacOS/HeliosViewer
-          cat > dist-mac/HeliosViewer.app/Contents/Info.plist <<'PLIST'
+          mkdir -p dist-mac/Helios.app/Contents/MacOS dist-mac/Helios.app/Contents/Resources
+          swift apps/helios-macos/scripts/make_icon.swift dist-mac/Helios.iconset
+          iconutil -c icns dist-mac/Helios.iconset -o dist-mac/Helios.app/Contents/Resources/Helios.icns
+          rm -rf dist-mac/Helios.iconset
+          cp apps/helios-macos/.build/release/HeliosViewer dist-mac/Helios.app/Contents/MacOS/Helios
+          printf "APPL????" > dist-mac/Helios.app/Contents/PkgInfo
+          cat > dist-mac/Helios.app/Contents/Info.plist <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-            <key>CFBundleExecutable</key><string>HeliosViewer</string>
+            <key>CFBundleDevelopmentRegion</key><string>en</string>
+            <key>CFBundleDisplayName</key><string>Helios</string>
+            <key>CFBundleExecutable</key><string>Helios</string>
+            <key>CFBundleIconFile</key><string>Helios</string>
             <key>CFBundleIdentifier</key><string>com.helios.viewer</string>
-            <key>CFBundleName</key><string>HeliosViewer</string>
+            <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+            <key>CFBundleName</key><string>Helios</string>
             <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>0.1.0</string>
+            <key>CFBundleShortVersionString</key><string>0.2.0</string>
+            <key>CFBundleVersion</key><string>2</string>
+            <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
             <key>LSMinimumSystemVersion</key><string>14.0</string>
             <key>NSHighResolutionCapable</key><true/>
+            <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+            <key>NSPrincipalClass</key><string>NSApplication</string>
           </dict>
           </plist>
           PLIST
-          (cd dist-mac && zip -rq HeliosViewer-macOS.zip HeliosViewer.app)
-          rm -rf dist-mac/HeliosViewer.app
-          cp apps/helios-macos/.build/release/HeliosViewer dist-mac/HeliosViewer
+          codesign --force --deep --sign - dist-mac/Helios.app
+          (cd dist-mac && zip -rq Helios-macOS.zip Helios.app)
+          rm -rf dist-mac/Helios.app
           cp target/release/helios-cli dist-mac/helios-cli
       - name: Upload macOS Viewer artifact
         uses: actions/upload-artifact@v4
@@ -81,7 +93,7 @@ jobs:
           path: dist-mac/
 
   publish-release:
-    name: Publish Latest Pre-Release
+    name: Publish Latest Release
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
@@ -107,9 +119,8 @@ jobs:
           gh release create latest \
             release-assets/helios-host.exe \
             release-assets/helios-host-windows-x64.zip \
-            release-assets/HeliosViewer-macOS.zip \
-            release-assets/HeliosViewer \
+            release-assets/Helios-macOS.zip \
             release-assets/helios-cli \
-            --title "Helios Latest Build (Double-Click Windows Host & macOS App)" \
-            --notes "Double-click helios-host.exe on Windows to auto-install in the background and display your unique Access Passcode. Unzip HeliosViewer-macOS.zip on Mac and double-click HeliosViewer.app to connect." \
-            --prerelease
+            --title "Helios Latest (Windows Host & macOS Liquid Glass App)" \
+            --notes "Windows: Double-click helios-host.exe to install in the background and show your unique Access Passcode. macOS: Unzip Helios-macOS.zip and drag Helios.app into /Applications (or run ./apps/helios-macos/install_macos_app.sh with Xcode)." \
+            --latest
